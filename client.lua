@@ -38,6 +38,8 @@ local function criarGuarda(index, config, guardaIndex)
     local coords = config.rotas[rotaIndex]
     local guarda = CreatePed(4, modelHash, coords.x, coords.y, coords.z, 0.0, true, true)
 
+    SetPedMaxHealth(guarda, 500)
+
     SetPedRelationshipGroupHash(guarda, grupoGuardas)
     SetPedCombatAttributes(guarda, 46, true)
     SetPedFleeAttributes(guarda, 0, false)
@@ -46,6 +48,7 @@ local function criarGuarda(index, config, guardaIndex)
     GiveWeaponToPed(guarda, armaHash, 255, false, true)
     SetCurrentPedWeapon(guarda, armaHash, true) 
     TaskGoStraightToCoord(guarda, coords.x, coords.y, coords.z, 1.0, -1, 0.0, 0.0)
+    SetPedArmour(guarda, 300)
 
     guardas[index] = { ped = guarda, config = config, rotaIndex = rotaIndex, guardaIndex = guardaIndex }
 end
@@ -107,6 +110,42 @@ end
 --     end
 -- end)
 
+-- CreateThread(function()
+--     while true do
+--         for i, guardaData in pairs(guardas) do
+--             local ped = guardaData.ped
+--             local rota = guardaData.config.rotas
+--             local config = guardaData.config
+
+--             if DoesEntityExist(ped) and not IsEntityDead(ped) then
+--                 -- Verifica se há um jogador próximo
+--                 local jogadorMaisProximo = GetClosestPlayerToPed(ped, config.distanciaDeteccao)
+
+--                 if jogadorMaisProximo then
+--                     local jogadorId = GetPlayerServerId(NetworkGetEntityOwner(jogadorMaisProximo))
+
+--                     VerificarPermissoes(jogadorId, config.permissoes, function(temPermissao)
+--                         if temPermissao then
+--                             -- Permissão detectada, o segurança permanece parado
+--                             ClearPedTasks(ped)
+--                         else
+--                             -- Jogador detectado sem permissão, inicia ataque
+--                             if GetEntityHealth(jogadorMaisProximo) > 101 then
+--                                 TaskCombatPed(ped, jogadorMaisProximo, 0, 16)
+--                             end
+--                         end
+--                     end)
+--                 else
+--                     -- Se nenhum jogador estiver próximo, os seguranças permanecem parados
+--                     ClearPedTasks(ped)
+--                 end
+--             end
+--         end
+--         Wait(1000) -- Intervalo de 1 segundo entre verificações
+--     end
+-- end)
+
+
 CreateThread(function()
     while true do
         for i, guardaData in pairs(guardas) do
@@ -133,14 +172,31 @@ CreateThread(function()
                         end
                     end)
                 else
-                    -- Se nenhum jogador estiver próximo, os seguranças permanecem parados
-                    ClearPedTasks(ped)
+                    -- Se nenhum jogador estiver próximo, siga a rota
+                    if config.andar then
+                        local atualCoords = GetEntityCoords(ped)
+                        local destino = rota[guardaData.rotaIndex]
+
+                        if #(atualCoords - destino) < 1.5 then
+                            if config.rotaSequencial then
+                                guardaData.rotaIndex = (guardaData.rotaIndex % #rota) + 1
+                            else
+                                guardaData.rotaIndex = math.random(1, #rota)
+                            end
+                            destino = rota[guardaData.rotaIndex]
+                        end
+
+                        TaskGoStraightToCoord(ped, destino.x, destino.y, destino.z, 1.0, -1, 0.0, 0.0)
+                    else
+                        ClearPedTasks(ped)
+                    end
                 end
             end
         end
         Wait(1000) -- Intervalo de 1 segundo entre verificações
     end
 end)
+
 
 
 function VerificarPermissoes(jogadorId, permissoes, callback)
