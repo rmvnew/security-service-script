@@ -26,3 +26,5 @@ AddEventHandler("guarda:verificarPermissao", function(user_id, permissoes)
     end
     TriggerClientEvent("guarda:callbackPermissao", source, temPermissao)
 end)
+
+
